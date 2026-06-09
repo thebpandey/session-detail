@@ -293,3 +293,31 @@ Founder, Almora Technology
 ## License
 
 MIT. See [LICENSE](LICENSE).
+
+---
+
+## Claude Code
+
+A Claude Code command version of this skill is available in the `claude-code/` directory of this repo.
+
+### Installation
+
+1. Create the Claude Code commands directory if it does not exist:
+
+```bash
+mkdir -p ~/.claude/commands
+```
+
+2. Copy the command file:
+
+```bash
+cp claude-code/session-detail.md ~/.claude/commands/session-detail.md
+```
+
+3. Restart any active Claude Code session. The command will appear in autocomplete when you type `/`.
+
+### Usage
+/session-detail
+
+Claude Code will pull live git state, generate the full session archive, write it to `_sessions/` in your current repo, and ask whether you want the output displayed in chat. Default is no display; press Enter to skip.
+
