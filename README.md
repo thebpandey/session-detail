@@ -1,6 +1,6 @@
 # session-detail
 
-A Claude skill that **records a work session in expansive instead of summarizing it.** It produces a full markdown archive of everything that happened, plus a compact context-handoff block you paste into your next session to resume work without losing state.
+A Claude skill that **records a work session verbatim instead of summarizing it.** It produces a full markdown archive of everything that happened, plus a compact context-handoff block you paste into your next session to resume work without losing state.
 
 If you have ever ended a long Claude session and then started a new one only to spend twenty minutes re-explaining what you already decided, this skill is the fix.
 
@@ -62,9 +62,28 @@ This repo ships the same archive in two forms. Pick based on where you want the 
 | Output goes to | Printed in chat, copy-paste ready | Written to a file in `_sessions/` |
 | Chat output | Both full sections | One-line confirmation plus a `Display output in chat? (y/N):` prompt |
 | Works on | Claude.ai and Claude Code | Claude Code only |
+| Same-session detection | Scans conversation context | Matches `$CLAUDE_SESSION_ID`, falls back to date |
 | "Prompts Generated for Next Session" section | Included | Omitted by design |
 
 Short version: use the **skill** when you want the archive in front of you to copy somewhere. Use the **command** when you want a durable dated file committed to the repo without cluttering the chat.
+
+### Incremental checkpoints and file naming
+
+Each checkpoint carries a hidden marker on its first line that records the tool, the session key, a sequence number, and the time it was generated:
+
+```
+<!-- session-detail | tool=code | session=<key> | seq=2 | generated=2026-06-20-11-30 -->
+```
+
+That marker is how a later run knows what was already captured and where the new work begins. An incremental covers only what happened after the previous checkpoint's `generated` time.
+
+Files are named with a tool prefix so their origin is obvious:
+
+- `code-YYYY-MM-DD-HH-MM-session-##.md` (full, written by Claude Code)
+- `code-YYYY-MM-DD-HH-MM-session-##-inc-NN.md` (incremental, `NN` starts at 02)
+- `claude-...` and `cowork-...` are the prefixes used in the **suggested filename** the skill prints in chat. Claude.ai and Cowork do not write to disk; only Claude Code does.
+
+The `##` is the Nth distinct session of the day. The `-inc-NN` suffix counts checkpoints within one session, so `code-...-session-01-inc-02.md` is the second checkpoint of session 01.
 
 ---
 
@@ -75,6 +94,22 @@ Say any of these to invoke the skill. No setup or slash command required.
 - `session detail`
 - `detailed session summary`
 - `session archive`
+
+By default the skill auto-detects whether a checkpoint already exists for the current session. If one does, it produces an **incremental** that covers only the work since that checkpoint. If none does, it produces a **full** archive. You can force either mode:
+
+**Force a full archive** (captures the whole session even if a checkpoint already exists):
+- `full session detail`
+- `full session-detail`
+- `session-detail full`
+- `session detail full`
+
+**Force an incremental** (captures only new work since the last checkpoint):
+- `session detail incremental`
+- `session-detail inc`
+
+On Claude Code the command takes the same modes as an argument: `/session-detail`, `/session-detail full`, or `/session-detail inc`.
+
+If a prior checkpoint exists but the skill cannot confirm it belongs to the current session, it asks one question and defaults to full.
 
 ---
 
