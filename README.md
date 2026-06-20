@@ -1,6 +1,6 @@
 # session-detail
 
-A Claude skill that **records a work session verbatim instead of summarizing it.** It produces a full markdown archive of everything that happened, plus a compact context-handoff block you paste into your next session to resume work without losing state.
+A Claude skill that **records a work session in expansive instead of summarizing it.** It produces a full markdown archive of everything that happened, plus a compact context-handoff block you paste into your next session to resume work without losing state.
 
 If you have ever ended a long Claude session and then started a new one only to spend twenty minutes re-explaining what you already decided, this skill is the fix.
 
@@ -10,6 +10,7 @@ If you have ever ended a long Claude session and then started a new one only to 
 
 - [Why This Exists](#why-this-exists)
 - [What It Produces](#what-it-produces)
+- [Skill vs Command](#skill-vs-command)
 - [Trigger Phrases](#trigger-phrases)
 - [Installation](#installation)
 - [Full Example Output](#full-example-output)
@@ -50,7 +51,24 @@ The forward-facing block. New persistent facts, changed or corrected facts, lock
 
 ---
 
-## Trigger Phrases
+## Skill vs Command
+
+This repo ships the same archive in two forms. Pick based on where you want the output to land.
+
+| | Skill (`SKILL.md`) | Command (`claude-code/session-detail.md`) |
+|---|---|---|
+| Installs to | `.claude/skills/session-detail/` | `~/.claude/commands/session-detail.md` |
+| Invoked by | Natural-language phrases ("session detail", "session archive") | The explicit `/session-detail` slash command |
+| Output goes to | Printed in chat, copy-paste ready | Written to a file in `_sessions/` |
+| Chat output | Both full sections | One-line confirmation plus a `Display output in chat? (y/N):` prompt |
+| Works on | Claude.ai and Claude Code | Claude Code only |
+| "Prompts Generated for Next Session" section | Included | Omitted by design |
+
+Short version: use the **skill** when you want the archive in front of you to copy somewhere. Use the **command** when you want a durable dated file committed to the repo without cluttering the chat.
+
+---
+
+
 
 Say any of these to invoke the skill. No setup or slash command required.
 
@@ -84,6 +102,15 @@ Either way the result is:
 ```
 
 As of the January 2026 Claude Code release, skills placed in `.claude/skills` activate immediately without restarting the session.
+
+**Optional: install the slash command too.** This repo also ships a Claude Code command that writes the archive to a file instead of printing it to chat. Copy it into your commands directory:
+
+User-level (all projects):
+```bash
+cp claude-code/session-detail.md ~/.claude/commands/session-detail.md
+```
+
+Then run `/session-detail` in any Claude Code session. It writes the archive to `_sessions/<YYYY-MM-DD-HH-MM>-session-<##>.md` in the current repo, prints a one-line confirmation, and asks `Display output in chat? (y/N):` (defaulting to N). See [Skill vs Command](#skill-vs-command) for when to use which.
 
 ### Option B: Claude.ai (zip upload)
 
@@ -286,38 +313,10 @@ Founder, Almora Technology
 
 - LinkedIn: [linkedin.com/in/pandeybhaskar](https://www.linkedin.com/in/pandeybhaskar)
 - GitHub: [github.com/thebpandey](https://github.com/thebpandey)
-- Email: [bhaskar.knp@gmail.com](mailto:bhaskar.knp@gmail.com)
+- Email: your-email@example.com
 
 ---
 
 ## License
 
 MIT. See [LICENSE](LICENSE).
-
----
-
-## Claude Code
-
-A Claude Code command version of this skill is available in the `claude-code/` directory of this repo.
-
-### Installation
-
-1. Create the Claude Code commands directory if it does not exist:
-
-```bash
-mkdir -p ~/.claude/commands
-```
-
-2. Copy the command file:
-
-```bash
-cp claude-code/session-detail.md ~/.claude/commands/session-detail.md
-```
-
-3. Restart any active Claude Code session. The command will appear in autocomplete when you type `/`.
-
-### Usage
-/session-detail
-
-Claude Code will pull live git state, generate the full session archive, write it to `_sessions/` in your current repo, and ask whether you want the output displayed in chat. Default is no display; press Enter to skip.
-
