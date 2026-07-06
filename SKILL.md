@@ -29,7 +29,7 @@ If you cannot tell Cowork from Claude.ai, default the prefix to `claude`.
    - Force incremental: "session detail incremental", "session-detail inc". Produce an INCREMENTAL. If no prior checkpoint can be found, say so in one line and produce a FULL instead (there is nothing to increment from).
 
 2. **No override: auto-detect.** Look for the most recent prior checkpoint belonging to THIS session.
-   - **Claude Code**: scan `_sessions/` for a checkpoint whose marker `session=` equals the current `$CLAUDE_SESSION_ID`. (This skill reads to detect; it still does not write.)
+   - **Claude Code**: scan both `_sessions/` on disk AND the current conversation context for `<session_full>` blocks. A prior checkpoint qualifies if its marker `session=` equals the current `$CLAUDE_SESSION_ID`. Check both sources because this skill prints to chat (not disk), so a checkpoint generated earlier in this same Claude Code session exists only in the conversation context, not in `_sessions/`. If candidates are found in both locations, use the one with the highest `seq`. (This skill reads to detect; it still does not write.)
    - **Claude.ai and Cowork**: scan the current conversation context for the most recent `<session_full>` block that you generated earlier in this same conversation.
    - **None found** -> FULL, `seq=1`.
    - **Found and same-session is certain** -> INCREMENTAL, `seq = prior seq + 1`.

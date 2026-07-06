@@ -136,7 +136,7 @@ Either way the result is:
 .claude/skills/session-detail/SKILL.md
 ```
 
-As of the January 2026 Claude Code release, skills placed in `.claude/skills` activate immediately without restarting the session.
+Recent versions of Claude Code pick up new skills in `.claude/skills` without a restart. If the skill does not trigger, restart the session.
 
 **Optional: install the slash command too.** This repo also ships a Claude Code command that writes the archive to a file instead of printing it to chat. Copy it into your commands directory:
 
@@ -348,7 +348,7 @@ Founder, Almora Technology
 
 - LinkedIn: [linkedin.com/in/pandeybhaskar](https://www.linkedin.com/in/pandeybhaskar)
 - GitHub: [github.com/thebpandey](https://github.com/thebpandey)
-- Email: your-email@example.com
+- Email: [bhaskar.knp@gmail.com](mailto:bhaskar.knp@gmail.com)
 
 ---
 
