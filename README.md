@@ -59,13 +59,13 @@ This repo ships the same archive in two forms. Pick based on where you want the 
 |---|---|---|
 | Installs to | `.claude/skills/session-detail/` | `~/.claude/commands/session-detail.md` |
 | Invoked by | Natural-language phrases ("session detail", "session archive") | The explicit `/session-detail` slash command |
-| Output goes to | Printed in chat, copy-paste ready | Written to a file in `_sessions/` |
+| Output goes to | Downloadable file on Claude.ai/Cowork (chat is the fallback); chat on Claude Code | Written to a file in `_sessions/` |
 | Chat output | Both full sections | One-line confirmation plus a `Display output in chat? (y/N):` prompt |
 | Works on | Claude.ai and Claude Code | Claude Code only |
 | Same-session detection | Scans conversation context | Matches `$CLAUDE_SESSION_ID`, falls back to date |
 | "Prompts Generated for Next Session" section | Included | Omitted by design |
 
-Short version: use the **skill** when you want the archive in front of you to copy somewhere. Use the **command** when you want a durable dated file committed to the repo without cluttering the chat.
+Short version: use the **skill** when you want the archive as a portable file (or in chat) outside any repo. Use the **command** when you want a durable dated file committed to the repo without cluttering the chat.
 
 ### Incremental checkpoints and file naming
 
@@ -75,15 +75,15 @@ Each checkpoint carries a hidden marker on its first line that records the tool,
 <!-- session-detail | tool=code | session=<key> | seq=2 | generated=2026-06-20-11-30 -->
 ```
 
-That marker is how a later run knows what was already captured and where the new work begins. An incremental covers only what happened after the previous checkpoint's `generated` time.
+That marker is how a later run knows a prior checkpoint exists and which session it belongs to. The incremental boundary itself is positional: a new incremental covers only conversation content that comes after the previous checkpoint's position (or, for files read from disk, only work the previous checkpoint's content does not already cover). The `generated` field is metadata for humans and tooling, not the boundary mechanism.
 
-Files are named with a tool prefix so their origin is obvious:
+Files are named with a tool prefix so their origin is obvious, and a session-ID fragment so files from the same session associate without any counting:
 
-- `code-YYYY-MM-DD-HH-MM-session-##.md` (full, written by Claude Code)
-- `code-YYYY-MM-DD-HH-MM-session-##-inc-NN.md` (incremental, `NN` starts at 02)
-- `claude-...` and `cowork-...` are the prefixes used in the **suggested filename** the skill prints in chat. Claude.ai and Cowork do not write to disk; only Claude Code does.
+- `code-YYYY-MM-DD-HH-MM-<sid8>.md` (full, written by the Claude Code command)
+- `code-YYYY-MM-DD-HH-MM-<sid8>-inc-NN.md` (incremental, `NN` equals the marker `seq` and starts at 02)
+- `claude-...` and `cowork-...` are the prefixes used for the file the skill produces on Claude.ai and Cowork (or for the suggested filename when output goes to chat). Only the Claude Code command writes into a repo's `_sessions/`.
 
-The `##` is the Nth distinct session of the day. The `-inc-NN` suffix counts checkpoints within one session, so `code-...-session-01-inc-02.md` is the second checkpoint of session 01.
+`sid8` is the first 8 alphanumeric characters of the session key: the first 8 characters of `$CLAUDE_SESSION_ID` on Claude Code, or date digits derived from the first message timestamp elsewhere. Files sharing a `sid8` belong to the same session, so `code-...-a3f9c12b.md` and `code-...-a3f9c12b-inc-02.md` pair by inspection. This replaces the old session-counting scheme (`session-##`), which required directory scans and broke across midnight. The marker's full `session=` key remains the ground truth for matching; `sid8` is the human-readable hint. Old `session-##` files are still detected correctly because matching reads markers, not filenames.
 
 ---
 
@@ -145,7 +145,7 @@ User-level (all projects):
 cp claude-code/session-detail.md ~/.claude/commands/session-detail.md
 ```
 
-Then run `/session-detail` in any Claude Code session. It writes the archive to `_sessions/<YYYY-MM-DD-HH-MM>-session-<##>.md` in the current repo, prints a one-line confirmation, and asks `Display output in chat? (y/N):` (defaulting to N). See [Skill vs Command](#skill-vs-command) for when to use which.
+Then run `/session-detail` in any Claude Code session. It writes the archive to `_sessions/code-<YYYY-MM-DD-HH-MM>-<sid8>.md` in the current repo, prints a one-line confirmation, and asks `Display output in chat? (y/N):` (defaulting to N). See [Skill vs Command](#skill-vs-command) for when to use which.
 
 ### Option B: Claude.ai (zip upload)
 
@@ -167,7 +167,7 @@ Below is a fabricated example showing what the skill returns. The imaginary sess
 
 <session_full>
 
-# Session 2026-05-28-09-15-SESSION-01
+# Session claude-2026-05-28-09-15-20260528
 Date: 2026-05-28
 Duration: 2 hours 10 minutes
 
@@ -238,11 +238,6 @@ did not map cleanly.
 - Sorting is client-side only. When the live API arrives, decide whether sorting moves server-side for large datasets.
 - The empty-state row is keyed separately so it does not interfere with sort logic.
 
-## Memory State
-- The screening API contract is not yet final. All data is currently mocked.
-- Status styling is centralized and must not be duplicated inline.
-- Client-side sorting is an interim choice pending dataset-size data from the live API.
-
 ## Next Session
 - [ ] Run the swap-mock-for-live-api prompt once the API contract is signed.
 - [ ] Decide client-side versus server-side sorting based on expected row counts.
@@ -293,7 +288,6 @@ did not map cleanly.
 | session_full | Prompts Generated for Next Session | Prompts drafted but not run, captured verbatim |
 | session_full | Code Changes | New, modified, and deleted files |
 | session_full | Technical Notes | Patterns, configs, and details worth preserving |
-| session_full | Memory State | Durable project facts that should persist |
 | session_full | Next Session | Checklist of priority tasks |
 | context_updates | New Persistent Facts | Facts established this session that carry forward |
 | context_updates | Changed or Corrected Facts | Superseded assumptions, in OLD then NEW form |

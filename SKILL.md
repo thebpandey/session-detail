@@ -1,6 +1,6 @@
 ---
 name: session-detail
-description: "Generates a structured, detailed session archive in markdown format for long-term logging, record-keeping, or session handoff. Triggers on: \"session detail\", \"detailed session summary\", \"session archive\". Force a full archive with \"full session detail\", \"full session-detail\", \"session-detail full\", \"session detail full\". Force an incremental with \"session detail incremental\", \"session-detail inc\". Always trigger this skill on these exact phrases. Do not answer them directly without consulting this skill. By default the skill auto-detects whether an earlier checkpoint exists in the current session and produces an incremental from that point, otherwise a full. Output is copy-paste ready markdown with exactly two sections: Full Version (session_full) and Context Updates (context_updates)."
+description: "Generates a structured, detailed session archive in markdown format for long-term logging, record-keeping, or session handoff. Triggers on: \"session detail\", \"detailed session summary\", \"session archive\". Force a full archive with \"full session detail\", \"full session-detail\", \"session-detail full\", \"session detail full\". Force an incremental with \"session detail incremental\", \"session-detail inc\". Always trigger this skill on these exact phrases. Do not answer them directly without consulting this skill. By default the skill auto-detects whether an earlier checkpoint exists in the current session and produces an incremental from that point, otherwise a full. Output is markdown with exactly two sections: Full Version (session_full) and Context Updates (context_updates), delivered as a downloadable file where the environment supports it, otherwise in chat."
 ---
 
 # Session Detail Skill
@@ -11,7 +11,10 @@ Do not ask the user to paste the conversation. You already have it in context. T
 
 **STRICT OUTPUT RULE: Generate exactly two sections -- `<session_full>` and `<context_updates>`. No other sections.**
 
-This skill is chat-only in every tool. It prints the archive to chat. It never writes to disk. (The separate Claude Code slash command is the file-writing form; this skill is not.) When you produce output, include a `Suggested filename:` line so the user can save it manually if they wish.
+Output destination depends on the environment:
+- **Claude.ai and Cowork**: if file creation is available, write the archive to a downloadable .md file using the suggested filename and present it to the user; print to chat only if file creation is unavailable or the user explicitly asks for chat output. A 15-20KB archive printed into chat is carried in context on every subsequent turn; a file is not.
+- **Claude Code**: print to chat. The separate Claude Code slash command is the file-writing form for repo `_sessions/` archives; this skill does not write into the repo.
+In every case, include a `Suggested filename:` line inside the archive so the user can save or rename it.
 
 ### Step 1: Detect the tool and build the prefix
 
@@ -30,7 +33,7 @@ If you cannot tell Cowork from Claude.ai, default the prefix to `claude`.
 
 2. **No override: auto-detect.** Look for the most recent prior checkpoint belonging to THIS session.
    - **Claude Code**: scan both `_sessions/` on disk AND the current conversation context for `<session_full>` blocks. A prior checkpoint qualifies if its marker `session=` equals the current `$CLAUDE_SESSION_ID`. Check both sources because this skill prints to chat (not disk), so a checkpoint generated earlier in this same Claude Code session exists only in the conversation context, not in `_sessions/`. If candidates are found in both locations, use the one with the highest `seq`. (This skill reads to detect; it still does not write.)
-   - **Claude.ai and Cowork**: scan the current conversation context for the most recent `<session_full>` block that you generated earlier in this same conversation.
+   - **Claude.ai and Cowork**: scan the current conversation context for the most recent `<session_full>` block that you generated earlier in this same conversation, including the contents of any archive file you created earlier this session (the file's content passes through your tool calls and remains visible in context).
    - **None found** -> FULL, `seq=1`.
    - **Found and same-session is certain** -> INCREMENTAL, `seq = prior seq + 1`.
    - **Found but same-session cannot be confirmed** (for example `$CLAUDE_SESSION_ID` is unavailable and only a same-date file exists, or a checkpoint appears in context that may have been pasted in from a different conversation) -> ASK exactly one line and wait:
@@ -39,7 +42,7 @@ If you cannot tell Cowork from Claude.ai, default the prefix to `claude`.
 
 ### Step 3: Honor the incremental boundary
 
-For an INCREMENTAL, capture only what happened AFTER the prior checkpoint's `generated` point. Do not repeat anything already captured in the prior checkpoint. Begin the archive body with one line:
+For an INCREMENTAL, the boundary is positional, not temporal: capture only the conversation content that comes AFTER the prior checkpoint's position in this conversation (or, when the prior checkpoint was read from disk, only work not already covered by its content). Conversation messages carry no visible timestamps, so never attempt to apply a wall-clock boundary; the prior block's position and content define what is already captured. The marker's `generated` field is metadata for humans and file tooling, not the boundary mechanism. Do not repeat anything already captured in the prior checkpoint. Begin the archive body with one line:
 `Incremental checkpoint, seq <n>, continues from <prior label> generated <time>. Covers only work since that point.`
 
 If the prior checkpoint is missing from context (for example it was compacted out on a long conversation), say so in one line, then produce a FULL rather than guessing at a boundary.
@@ -47,9 +50,10 @@ If the prior checkpoint is missing from context (for example it was compacted ou
 ### Step 4: Derive identifiers
 
 - **Timestamp**: `YYYY-MM-DD-HH-MM` for now. On Claude Code use `date "+%Y-%m-%d-%H-%M"`; elsewhere use the current time.
-- **Session number `##`**: on Claude Code this is the Nth distinct session today; elsewhere default to `01` (best-effort, since there is no disk to count).
-- **Session ID label**: `<prefix>-<YYYY-MM-DD-HH-MM>-SESSION-<##>` for a full, or `<prefix>-<YYYY-MM-DD-HH-MM>-SESSION-<##>-INC-<NN>` for an incremental (NN starts at 02).
-- **Suggested filename**: the lowercase form, for example `code-2026-06-20-09-15-session-01-inc-02.md`.
+- **Session key**: `$CLAUDE_SESSION_ID` on Claude Code (or `unverified-<timestamp>` if unavailable); the first user message timestamp on Claude.ai and Cowork. The key goes in the marker and is the ground truth for same-session matching.
+- **sid8**: the first 8 alphanumeric characters of the session key (strip dashes and other punctuation first). On Claude Code this is the first 8 characters of the session UUID; on Claude.ai and Cowork it degenerates to the date digits, which is acceptable because there is no disk there to collide on. sid8 is a human-readable hint in the filename; the marker remains the ground truth.
+- **Session ID label**: `<prefix>-<YYYY-MM-DD-HH-MM>-<sid8>` for a full, or `<prefix>-<YYYY-MM-DD-HH-MM>-<sid8>-INC-<NN>` for an incremental. NN equals the marker `seq` and starts at 02. There is no session counting: no directory scans to number sessions, no Nth-session-today logic, no day-rollover edge.
+- **Suggested filename**: the lowercase form with `.md`, for example `code-2026-06-20-09-15-a3f9c12b-inc-02.md`.
 - **Project name**: infer from the conversation, or use "Untitled Project" if unclear.
 - **Duration**: estimate from first and last message timestamps if available, otherwise omit.
 
@@ -77,9 +81,9 @@ Generate **exactly two sections** using the exact XML tags below. No other secti
 
 <session_full>
 <!-- session-detail | tool=[code|claude|cowork] | session=[key] | seq=[n] | generated=[YYYY-MM-DD-HH-MM] -->
-# Session [PREFIX-YYYY-MM-DD-HH-MM-SESSION-## or -INC-NN for an incremental]
+# Session [PREFIX-YYYY-MM-DD-HH-MM-SID8 or -INC-NN for an incremental]
 Date: [YYYY-MM-DD]
-Suggested filename: [prefix-yyyy-mm-dd-hh-mm-session-##.md, or -inc-NN.md for an incremental]
+Suggested filename: [prefix-yyyy-mm-dd-hh-mm-sid8.md, or -inc-NN.md for an incremental]
 Duration: [HH hours MM minutes, or omit if not determinable]
 
 ## Accomplished
@@ -129,9 +133,6 @@ Duration: [HH hours MM minutes, or omit if not determinable]
 ## Technical Notes
 [Implementation details, patterns, configurations, or technical context worth preserving.]
 
-## Memory State
-[Key project facts, decisions, and context that should persist across conversations.]
-
 ## Next Session
 - [ ] [Priority task 1]
 - [ ] [Priority task 2]
@@ -174,8 +175,8 @@ After both sections, output exactly this line (substituting the session ID):
 ## Guardrails
 
 - Do not leave any placeholder unfilled. If the conversation does not contain enough information to populate a field, omit the field or write "N/A" -- never output raw bracket placeholders like `[What was decided]`.
-- **This skill never writes to disk in any tool.** It prints to chat and provides a `Suggested filename:` line. Only the separate Claude Code slash command writes files to `_sessions/`.
-- **Incrementals capture only post-checkpoint work.** Never repeat content already captured in the prior checkpoint. If the prior checkpoint is not visible in context, produce a full and say so in one line rather than guessing the boundary.
+- **This skill never writes into the repo.** On Claude.ai and Cowork it produces a downloadable file (chat is the fallback); on Claude Code it prints to chat. Only the separate Claude Code slash command writes files to `_sessions/`.
+- **Incrementals capture only post-checkpoint work, bounded positionally.** The boundary is the prior checkpoint's position and content in the conversation, never a wall-clock time. Never repeat content already captured in the prior checkpoint. If the prior checkpoint is not visible in context, produce a full and say so in one line rather than guessing the boundary.
 - **Ask at most one question, and only on genuine ambiguity** (a prior checkpoint exists but cannot be confirmed as this session). Default to full on an unclear reply. Never ask the user to paste the conversation.
 - **Generated prompts must be captured verbatim.** If a prompt was drafted during the session but not executed, paste the entire prompt body into the "Prompts Generated for Next Session" section. Never capture only the name or a summary -- the prompt is unrecoverable without its full body.
 - Preserve exact wording for any code, copy, or specific formulations produced during the session. Do not paraphrase deliverables.

@@ -29,15 +29,15 @@ Generate an archive of the current session and write it to a file in the project
      `A prior session-detail checkpoint exists for today but I cannot confirm it is from this session. Generate (i)ncremental from it, or (f)ull? [f]:`
      Default to FULL on an empty or unclear reply.
 
-6. **Resolve the session number `##`.** This is the Nth distinct session today. Among today's `code-<date>-session-##` base files in `_sessions/`, for a FULL take the highest `##` and add one (start at `01` if none). For an INCREMENTAL, reuse the `##` of the matched session.
+6. **Derive `sid8`.** Take the session key (from step 1), strip all non-alphanumeric characters, and use the first 8 characters. For a `$CLAUDE_SESSION_ID` UUID this is the first 8 hex characters. For the `unverified-<timestamp>` fallback key this degenerates to `unverifi`; that is acceptable because same-session matching uses the full marker key, never the filename. There is no session counting: no Nth-session-today logic, no directory scans to number sessions, no day-rollover edge.
 
 7. **Build the filename and identifiers** (prefix is always `code` for this command).
-   - FULL filename: `_sessions/code-<YYYY-MM-DD-HH-MM>-session-<##>.md`
-   - INCREMENTAL filename: `_sessions/code-<YYYY-MM-DD-HH-MM>-session-<##>-inc-<NN>.md` where `NN` starts at `02` and increments per checkpoint.
-   - Session ID label inside the file: the same stem uppercased, for example `code-2026-06-20-09-15-SESSION-01-INC-02`.
+   - FULL filename: `_sessions/code-<YYYY-MM-DD-HH-MM>-<sid8>.md`
+   - INCREMENTAL filename: `_sessions/code-<YYYY-MM-DD-HH-MM>-<sid8>-inc-<NN>.md` where `NN` equals the marker `seq` and starts at `02`.
+   - Session ID label inside the file: the same stem uppercased, for example `code-2026-06-20-09-15-A3F9C12B-INC-02`.
 
 8. **Generate the archive content** using the Output Format below. Populate every field from the actual conversation. Do not leave bracket placeholders; omit a field or mark it `N/A`. Preserve exact wording for any code or specific copy produced this session.
-   - For an INCREMENTAL, capture only work done AFTER the matched checkpoint's `generated` time. Do not repeat already-captured content. Begin the body with one line: `Incremental checkpoint, seq <n>, continues from <prior label> generated <time>. Covers only work since that point.`
+   - For an INCREMENTAL, the boundary is the matched checkpoint's content, not a wall-clock time: read the matched checkpoint file and capture only work it does not already cover. Conversation messages carry no visible timestamps, so never attempt to apply a time boundary; the marker's `generated` field is metadata, not the boundary mechanism. Do not repeat already-captured content. Begin the body with one line: `Incremental checkpoint, seq <n>, continues from <prior label> generated <time>. Covers only work since that point.`
 
 9. **Stamp the marker** as the very first line inside the file, before the `# Session` heading:
    `<!-- session-detail | tool=code | session=<key> | seq=<n> | generated=<YYYY-MM-DD-HH-MM> -->`
@@ -61,7 +61,7 @@ Write the file with exactly two sections, in this order. No other sections.
 
 <session_full>
 <!-- session-detail | tool=code | session=[key] | seq=[n] | generated=[YYYY-MM-DD-HH-MM] -->
-# Session [code-YYYY-MM-DD-HH-MM-SESSION-## or -INC-NN for an incremental]
+# Session [code-YYYY-MM-DD-HH-MM-SID8 or -INC-NN for an incremental]
 Date: [YYYY-MM-DD]
 Duration: [HH hours MM minutes, or omit if not determinable]
 
@@ -98,9 +98,6 @@ Duration: [HH hours MM minutes, or omit if not determinable]
 ## Technical Notes
 [Implementation details, patterns, configurations, or technical context worth preserving.]
 
-## Memory State
-[Key project facts, decisions, and context that should persist across conversations.]
-
 ## Next Session
 - [ ] [Priority task 1]
 - [ ] [Priority task 2]
@@ -132,5 +129,5 @@ Duration: [HH hours MM minutes, or omit if not determinable]
 - Preserve exact wording for code and specific copy produced this session. Do not paraphrase deliverables.
 - The chat output is the confirmation line plus the y/N prompt only. Nothing else. (On ambiguity, the single detection question is the one allowed exception.)
 - **Same-session matching uses `$CLAUDE_SESSION_ID`, never the date alone.** A same-date file is not proof of the same session. Use date only as a fallback when the env var is empty, and ask before treating it as this session's checkpoint.
-- **Incrementals capture only post-checkpoint work.** Never repeat content already written in the matched checkpoint. The marker `seq` and `generated` fields define the boundary.
+- **Incrementals capture only post-checkpoint work, bounded by content.** Never repeat content already written in the matched checkpoint. The matched checkpoint's actual content defines the boundary; the marker `seq` and `generated` fields are bookkeeping, not the boundary mechanism.
 - This command does not include a "Prompts Generated for Next Session" section by design.
