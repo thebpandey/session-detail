@@ -83,6 +83,10 @@ Place this marker as the very first line inside `<session_full>`, before the `# 
 `<!-- session-detail | tool=<prefix> | session=<key> | seq=<n> | generated=<YYYY-MM-DD-HH-MM> -->`
 where `<key>` is `$CLAUDE_SESSION_ID` on Claude Code (or `unverified-<timestamp>` if unavailable), and the first user message timestamp on Claude.ai or Cowork.
 
+### Step 6: Perform the final sensitive-data review
+
+Before delivering the archive as a file or chat output, inspect the complete generated content a second time. Redact any credential, authentication material, private key, secret-bearing connection string, or other sensitive value missed during extraction. Do not deliver the archive until this review is complete. If the review causes any redaction, include the required security bullet under `## Technical Notes`.
+
 Output must be **pure markdown only**, clean and copy-paste ready. No preamble, no meta-commentary above the blocks. Deliver the archive and close with the single line specified in Closing Line.
 
 ---
@@ -197,6 +201,7 @@ After both sections, output exactly this line (substituting the session ID):
 - **Sensitive Data Protection is mandatory and takes precedence over every completeness, exact-copy, full-body, and verbatim-preservation instruction in this skill.**
 - Never place credentials, authentication material, private keys, secret-bearing connection strings, or other secret values in the archive. Replace them with typed redaction placeholders.
 - Never read a credential-bearing file solely to archive it. Only read files required for checkpoint detection or incremental comparison, and redact sensitive values from any new output.
+- Perform a second sensitive-data review of the complete generated archive before delivering it.
 - If any redaction occurs, include `- Security: Sensitive values were redacted from this archive.` under `## Technical Notes`.
 - Do not leave any placeholder unfilled. If the conversation does not contain enough information to populate a field, omit the field or write "N/A" -- never output raw bracket placeholders like `[What was decided]`.
 - **This skill never writes into the repo.** On Claude.ai and Cowork it produces a downloadable file (chat is the fallback); on Claude Code it prints to chat. Only the separate Claude Code slash command writes files to `_sessions/`.
