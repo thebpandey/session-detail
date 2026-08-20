@@ -11,6 +11,26 @@ Do not ask the user to paste the conversation. You already have it in context. T
 
 **STRICT OUTPUT RULE: Generate exactly two sections -- `<session_full>` and `<context_updates>`. No other sections.**
 
+## Sensitive Data Protection (Mandatory)
+
+Before generating an archive, review every candidate excerpt for credentials, authentication material, and other secret values. **Never reproduce a secret value. This requirement overrides every instruction to preserve content verbatim, in full, exactly, without summarization, or without abbreviation.**
+
+Redact all of the following when present:
+- Passwords, passphrases, PINs, recovery codes, and backup codes.
+- API keys, access tokens, refresh tokens, bearer tokens, session tokens, cookies, and authorization headers.
+- OAuth client secrets, webhook secrets, signing secrets, encryption secrets, private keys, and certificate blocks containing private-key material.
+- Database credentials and connection strings with embedded usernames, passwords, or tokens.
+- Cloud-provider credentials, package-registry tokens, SSH credentials, and secrets copied from `.env` or credential files.
+- Any additional value that the user identifies as secret, private, or sensitive.
+
+Preserve useful surrounding structure, labels, variable names, and safe code, but replace each secret value with a typed placeholder such as `OPENAI_API_KEY=[REDACTED: API KEY]` or `Authorization: Bearer [REDACTED: TOKEN]`. Replace an entire private-key or credential block with one placeholder such as `[REDACTED: PRIVATE KEY]`. Never retain a partial value, prefix, suffix, fingerprint, or URL parameter that could help reconstruct or use the secret. If uncertain whether a value is sensitive, redact it.
+
+Never inspect `.env*` files, credential stores, authentication files, SSH private keys, cloud credential files, secret-manager exports, or similar sources solely to include their contents in an archive. Reading a prior session archive is allowed only for checkpoint detection and incremental-boundary comparison; sensitive values found there must still be redacted from the new output.
+
+If any redaction occurs, add this bullet under `## Technical Notes`:
+`- Security: Sensitive values were redacted from this archive.`
+Do not identify the original value or include enough information to reconstruct it.
+
 Output destination depends on the environment:
 - **Claude.ai and Cowork**: if file creation is available, write the archive to a downloadable .md file using the suggested filename and present it to the user; print to chat only if file creation is unavailable or the user explicitly asks for chat output. A 15-20KB archive printed into chat is carried in context on every subsequent turn; a file is not.
 - **Claude Code**: print to chat. The separate Claude Code slash command is the file-writing form for repo `_sessions/` archives; this skill does not write into the repo.
@@ -112,7 +132,7 @@ Duration: [HH hours MM minutes, or omit if not determinable]
    - **Commit:** [Git commit message or SHA if applicable]
 
 ## Prompts Generated for Next Session
-[For each prompt generated during this session but NOT executed -- these are prompts created for future work, including Claude Code prompts, fix prompts, audit prompts, or any prompt drafted but deferred. CAPTURE THE FULL BODY VERBATIM, not just a name. Without the full body, the prompt is unrecoverable next session.]
+[For each prompt generated during this session but NOT executed -- these are prompts created for future work, including Claude Code prompts, fix prompts, audit prompts, or any prompt drafted but deferred. CAPTURE THE FULL BODY AFTER MANDATORY SENSITIVE-VALUE REDACTION, not just a name. Without the safe full body, the prompt is unrecoverable next session.]
 
 ### [Prompt Name or Purpose]
 **Intent:** [What problem this prompt is meant to solve]
@@ -120,7 +140,7 @@ Duration: [HH hours MM minutes, or omit if not determinable]
 **Target session/phase:** [When this should run]
 **Full prompt body:**
 ```
-[Paste the entire prompt body verbatim, including code blocks, constraints, and output requirements. Do not summarize. Do not abbreviate.]
+[Paste the entire prompt body after replacing all sensitive values with typed redaction placeholders. Do not summarize or abbreviate the remaining safe content.]
 ```
 
 [Repeat block above for each generated prompt. If no prompts were generated for next session, write "None this session."]
@@ -131,7 +151,7 @@ Duration: [HH hours MM minutes, or omit if not determinable]
 - Deleted files: [List]
 
 ## Technical Notes
-[Implementation details, patterns, configurations, or technical context worth preserving.]
+[Implementation details, patterns, configurations, or technical context worth preserving. If any redaction occurred, include the required security bullet.]
 
 ## Next Session
 - [ ] [Priority task 1]
@@ -174,11 +194,15 @@ After both sections, output exactly this line (substituting the session ID):
 
 ## Guardrails
 
+- **Sensitive Data Protection is mandatory and takes precedence over every completeness, exact-copy, full-body, and verbatim-preservation instruction in this skill.**
+- Never place credentials, authentication material, private keys, secret-bearing connection strings, or other secret values in the archive. Replace them with typed redaction placeholders.
+- Never read a credential-bearing file solely to archive it. Only read files required for checkpoint detection or incremental comparison, and redact sensitive values from any new output.
+- If any redaction occurs, include `- Security: Sensitive values were redacted from this archive.` under `## Technical Notes`.
 - Do not leave any placeholder unfilled. If the conversation does not contain enough information to populate a field, omit the field or write "N/A" -- never output raw bracket placeholders like `[What was decided]`.
 - **This skill never writes into the repo.** On Claude.ai and Cowork it produces a downloadable file (chat is the fallback); on Claude Code it prints to chat. Only the separate Claude Code slash command writes files to `_sessions/`.
 - **Incrementals capture only post-checkpoint work, bounded positionally.** The boundary is the prior checkpoint's position and content in the conversation, never a wall-clock time. Never repeat content already captured in the prior checkpoint. If the prior checkpoint is not visible in context, produce a full and say so in one line rather than guessing the boundary.
 - **Ask at most one question, and only on genuine ambiguity** (a prior checkpoint exists but cannot be confirmed as this session). Default to full on an unclear reply. Never ask the user to paste the conversation.
-- **Generated prompts must be captured verbatim.** If a prompt was drafted during the session but not executed, paste the entire prompt body into the "Prompts Generated for Next Session" section. Never capture only the name or a summary -- the prompt is unrecoverable without its full body.
-- Preserve exact wording for any code, copy, or specific formulations produced during the session. Do not paraphrase deliverables.
+- **Generated prompts must be captured in full after mandatory redaction.** Preserve the complete safe prompt body, including code blocks and constraints, while replacing every sensitive value. Never capture only the name or a summary when safe content is available.
+- Preserve exact wording for non-sensitive code, copy, and specific formulations produced during the session. Redact sensitive values before applying this requirement.
 - Do not include pleasantries, meta-discussion, or conversational overhead. Only substance.
 - Do not add any text above or below the two output sections except the single closing line.
