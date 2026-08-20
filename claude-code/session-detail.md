@@ -1,7 +1,7 @@
 ---
 description: Archive the current session to _sessions/ as a full or incremental timestamped markdown file
 argument-hint: "[full|inc]  (optional: force a full or incremental archive)"
-allowed-tools: Bash(date:*), Bash(ls:*), Bash(mkdir:*), Bash(echo:*), Bash(cat:*), Bash(grep:*), Bash(printf:*), Bash(git:*), Read, Write
+allowed-tools: Bash(date:*), Bash(ls:*), Bash(mkdir:*), Bash(echo:*), Bash(cat:*), Bash(grep:*), Bash(printf:*), Bash(git rev-parse:*), Bash(git check-ignore:*), Read, Write
 ---
 
 # Session Detail (Claude Code command)
@@ -40,7 +40,7 @@ Do not identify the original value or include enough information to reconstruct 
    - Run `git rev-parse --is-inside-work-tree`.
    - If the command succeeds and returns `true`, run `git rev-parse --git-path info/exclude` to resolve the repository's local exclude file.
    - Check that the exclude file contains an exact `_sessions/` line. If it does not, append `_sessions/` with `printf`. Do not edit the project's tracked `.gitignore`.
-   - Verify the rule with `git check-ignore -q --no-index _sessions/example.md`. If verification fails, stop before writing an archive and report that `_sessions/` could not be excluded safely.
+   - Verify the rule with `git check-ignore -q _sessions/example.md`. If verification fails, stop before writing an archive and report that `_sessions/` could not be excluded safely.
    - If the current directory is not a Git worktree, continue without the exclusion step.
 
 4. **Find any prior checkpoint for THIS session.** Run `ls _sessions/` then, for candidate files, read their first marker line (for example `grep -h "session-detail |" _sessions/*.md`). A prior checkpoint belongs to this session when its marker `session=` equals the current `$CLAUDE_SESSION_ID`. Record the highest `seq` among matches and the `generated` time of that latest match.
