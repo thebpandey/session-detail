@@ -4,6 +4,21 @@ All notable changes to this skill are documented here.
 
 ---
 
+## [1.2.0] - 2026-08-20
+
+### Security
+- **Mandatory sensitive-value redaction.** Both the skill and Claude Code command now redact passwords, API keys, tokens, cookies, private keys, secret-bearing connection strings, cloud credentials, and other identified secrets before preserving session content.
+- **Security rules override verbatim-preservation rules.** Generated prompts, code, and copy remain complete only after sensitive values are replaced with typed redaction placeholders.
+- **Credential-file access is restricted.** The skill and command must not inspect `.env*`, credential stores, SSH private keys, cloud credential files, secret-manager exports, or similar sources solely for archival.
+- **Final archive review added.** Both the skill and Claude Code command perform a second sensitive-data review of the complete generated archive before delivery or writing.
+- **Session archives are excluded from Git.** The Claude Code command adds `_sessions/` to the repository's local Git exclude file and verifies the rule before writing. The skill repository also ignores `_sessions/` directly.
+
+### Changed
+- Archives that contain redactions include a security notice under `## Technical Notes` without exposing the original values.
+- Documentation now distinguishes complete preservation of safe content from reproduction of sensitive values.
+
+---
+
 ## [1.1.0] - 2026-07-06
 
 ### Changed
