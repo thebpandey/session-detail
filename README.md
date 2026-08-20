@@ -5,7 +5,7 @@
 |                                                          |
 |   [ full ]--[ inc 02 ]--[ inc 03 ]--> next session       |
 |                                                          |
-|   Records the session. Does not summarize it.            |
+|   Records the session. Redacts secret values.            |
 |                                                          |
 +----------------------------------------------------------+
 ```
@@ -19,7 +19,7 @@
   <img src="https://img.shields.io/badge/Modes-Full%20%2B%20Incremental-b45309?style=for-the-badge" alt="Modes: Full + Incremental">
 </p>
 
-Session summaries compress, and compression is the problem: they discard the exact wording of decisions, the prompts you drafted but never ran, and the small technical notes that turn out to matter three days later, so you spend the start of every new session re-explaining what you already settled. `session-detail` records the session instead. It emits a complete verbatim archive (`<session_full>`) plus a compact handoff block (`<context_updates>`) that you paste into your next session to resume with your locked decisions, open questions, and known gotchas intact.
+Session summaries compress, and compression is the problem: they discard the exact wording of decisions, the prompts you drafted but never ran, and the small technical notes that turn out to matter three days later, so you spend the start of every new session re-explaining what you already settled. `session-detail` records the session instead. It emits a detailed archive (`<session_full>`) plus a compact handoff block (`<context_updates>`) that you paste into your next session to resume with your locked decisions, open questions, and known gotchas intact. Safe content is preserved in full; credentials and other secret values are replaced with typed redaction placeholders.
 
 ---
 
@@ -29,7 +29,7 @@ Every run produces exactly two blocks:
 
 | Block | Role | Contents |
 |---|---|---|
-| `<session_full>` | The archive | Accomplishments, decisions with rationale and alternatives, issues with root causes, prompts executed, prompts drafted but unrun (captured verbatim), code changes, technical notes, next-session priorities |
+| `<session_full>` | The archive | Accomplishments, decisions with rationale and alternatives, issues with root causes, prompts executed, prompts drafted but unrun (captured in full after sensitive-value redaction), code changes, technical notes, next-session priorities |
 | `<context_updates>` | The handoff | New facts, corrected facts, locked decisions, open questions, carry-forward warnings. This is the part you paste into your next conversation |
 
 ### Full and incremental modes
@@ -144,11 +144,13 @@ flowchart LR
     T[Detect tool] --> K[Read session key]
     K --> S[Scan for marker]
     S --> M[Resolve mode]
-    M --> G[Generate archive]
-    G --> P[Stamp marker]
+    M --> R[Redact secrets]
+    R --> G[Generate archive]
+    G --> V[Final security review]
+    V --> P[Stamp marker]
     P --> O{Skill or command}
     O -->|skill| E[File or chat]
-    O -->|command| W[Write to _sessions]
+    O -->|command| W[Write to ignored _sessions]
 ```
 
 Detection rests on a hidden marker stamped on line one of every checkpoint:
@@ -165,7 +167,7 @@ On Claude Code the session key is `$CLAUDE_SESSION_ID` (the date is a fallback o
 |---|---|---|
 | Installs to | `.claude/skills/session-detail/` | `~/.claude/commands/session-detail.md` |
 | Invoked by | Natural-language phrases | The `/session-detail` slash command |
-| Output | Downloadable file on Claude.ai/Cowork (chat is the fallback); chat on Claude Code | Written to a file in `_sessions/`, never to chat |
+| Output | Downloadable file on Claude.ai/Cowork (chat is the fallback); chat on Claude Code | Written to `_sessions/` after local Git-exclusion verification, never printed to chat by default |
 | Chat output | Both blocks | One-line confirmation plus a `Display output in chat? (y/N):` prompt |
 | Works on | Claude.ai, Cowork, and Claude Code | Claude Code only |
 
@@ -178,6 +180,32 @@ Files are tool-prefixed so their origin is obvious, and carry a session-ID fragm
 - `claude-` and `cowork-` prefixes name the file the skill produces on Claude.ai and Cowork (or the suggested filename when output goes to chat); those tools never write into a repo's `_sessions/`
 
 The marker's full `session=` key remains the ground truth for matching; `sid8` is the human-readable hint.
+
+---
+
+## Security
+
+Session archives are persistent artifacts. Sensitive-value protection therefore takes precedence over exact preservation.
+
+Before producing an archive, the skill and command must redact passwords, API keys, tokens, cookies, authorization headers, private keys, OAuth client secrets, secret-bearing connection strings, cloud credentials, and other values identified as secret or sensitive. Variable names and surrounding structure can remain, but the value is replaced with a typed placeholder such as:
+
+```text
+OPENAI_API_KEY=[REDACTED: API KEY]
+Authorization: Bearer [REDACTED: TOKEN]
+[REDACTED: PRIVATE KEY]
+```
+
+The skill and command must not inspect `.env*`, credential stores, SSH private keys, cloud credential files, secret-manager exports, or similar sources solely to copy them into an archive. The Claude Code command performs a second sensitive-data review before writing.
+
+When the slash command runs inside a Git worktree, it adds `_sessions/` to the repository's local Git exclude file and verifies that the directory is ignored before writing. This avoids changing the project's tracked `.gitignore` while reducing the chance of an archive being committed accidentally. The `session-detail` repository also ignores its own `_sessions/` directory.
+
+If a redaction occurs, the archive includes this notice under `## Technical Notes`:
+
+```text
+- Security: Sensitive values were redacted from this archive.
+```
+
+Redaction reduces accidental persistence risk, but it is not a reason to paste secrets into an AI conversation. Keep active credentials out of prompts and rotate any credential that was exposed before these protections were applied.
 
 ---
 
@@ -244,10 +272,10 @@ Note: the exact Settings menu label for skill upload has shifted between release
 
 - **End of a work block:** say `session detail`. First run of the session produces a full archive; later runs in the same session produce incrementals automatically.
 - **Next session:** paste the `<context_updates>` block from your last checkpoint into the new conversation. Claude picks up your locked decisions, open questions, and warnings without re-explanation.
-- **On Claude Code with the command installed:** run `/session-detail`. It writes `_sessions/code-<YYYY-MM-DD-HH-MM>-<sid8>.md` in the current repo, prints a one-line confirmation, and asks `Display output in chat? (y/N):` (defaulting to N), so a 15-20KB archive never sits in your context.
+- **On Claude Code with the command installed:** run `/session-detail`. It verifies that `_sessions/` is locally ignored, writes `_sessions/code-<YYYY-MM-DD-HH-MM>-<sid8>.md` in the current repo, prints a one-line confirmation, and asks `Display output in chat? (y/N):` (defaulting to N), so a 15-20KB archive never sits in your context.
 - **Override the mode** any time with `full` or `inc` as shown in [Real invocations](#real-invocations).
 
-No placeholders leak into output: fields that cannot be filled from the conversation are omitted or marked `N/A`. Prompts you drafted but never ran are captured in full, including code blocks and constraints, so they are recoverable later.
+No placeholders leak into output: fields that cannot be filled from the conversation are omitted or marked `N/A`. Prompts you drafted but never ran are captured in full, including code blocks and constraints, after sensitive values are replaced with typed redaction placeholders.
 
 ---
 
